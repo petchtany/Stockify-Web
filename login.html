@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ - Stockify</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
+</head>
+<body style="display: flex; height: 100vh; align-items: center; justify-content: center; background: var(--bg);">
+
+    <div class="card" style="width: 100%; max-width: 400px; text-align: center; padding: 40px;">
+        <h2>📦 เข้าสู่ระบบ Stockify</h2>
+        <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <input type="text" id="login-username" placeholder="อีเมล" style="padding: 12px; border-radius: 8px; border: 1px solid #ddd; width: 100%;">
+            <input type="password" id="login-password" placeholder="รหัสผ่าน" style="padding: 12px; border-radius: 8px; border: 1px solid #ddd; width: 100%;">
+            <button id="login-submit-btn" class="primary-btn" style="width: 100%;">Sign In</button>
+            <div id="login-error" style="color: red; display: none; margin-top: 10px; font-size: 14px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // บังคับให้รอหน้าเว็บโหลดเสร็จ 100% ค่อยทำงาน ป้องกันจอขาว
+        window.onload = function() {
+            const userPool = new AmazonCognitoIdentity.CognitoUserPool({ 
+                UserPoolId: 'ap-southeast-1_rsYwrROD2', 
+                ClientId: '4ft97t4m13vm22oen4nt0gbito' 
+            });
+
+            document.getElementById('login-submit-btn').onclick = () => {
+                const user = document.getElementById('login-username').value;
+                const pass = document.getElementById('login-password').value;
+                const btn = document.getElementById('login-submit-btn');
+                const errDiv = document.getElementById('login-error');
+
+                if (!user || !pass) return;
+                btn.innerText = "กำลังตรวจสอบ..."; btn.disabled = true;
+
+                const authDetails = new AmazonCognitoIdentity.AuthenticationDetails({ Username: user, Password: pass });
+                const loginUser = new AmazonCognitoIdentity.CognitoUser({ Username: user, Pool: userPool });
+
+                loginUser.authenticateUser(authDetails, {
+                    onSuccess: () => { window.location.href = 'index.html'; }, 
+                    onFailure: (err) => {
+                        btn.innerText = "Sign In"; btn.disabled = false;
+                        errDiv.innerText = "❌ " + (err.message || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+                        errDiv.style.display = 'block';
+                    },
+                    newPasswordRequired: function() {
+                        loginUser.completeNewPasswordChallenge(pass, {}, this);
+                    }
+                });
+            };
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Looma - Pro Inventory</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="container" id="main-app" style="display: none;"> 
+        <aside class="sidebar">
+            <div class="logo"><h2><i class="ph-fill ph-package"></i> Looma Stock</h2></div>
+            <nav class="menu">
+                <a href="#" class="nav-btn active" data-target="dashboard-view"><i class="ph ph-squares-four"></i> Dashboard</a>
+                <a href="#" class="nav-btn" data-target="products-view"><i class="ph ph-cube"></i> Products</a>
+                <a href="#" class="nav-btn" data-target="stock-view"><i class="ph ph-package"></i> Stock</a>
+                <a href="#" class="nav-btn" data-target="orders-view"><i class="ph ph-receipt"></i> Orders</a>
+                <a href="#" class="nav-btn" data-target="history-view"><i class="ph ph-clock-counter-clockwise"></i> History</a>
+                <a href="#" class="nav-btn" data-target="audit-view"><i class="ph ph-shield-check"></i> Audit Log</a>
+                
+                <button id="logout-btn" style="margin-top: 30px; padding: 12px; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 8px; cursor: pointer; width: 100%; font-weight: 600; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <i class="ph ph-sign-out"></i> Logout
+                </button>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <h1 id="page-title">Dashboard Overview</h1>
+                <div class="actions" style="display: flex; align-items: center; gap: 16px;">
+                    <button id="theme-toggle" style="background:var(--surface); border:1px solid var(--border); padding:10px; border-radius:50%; font-size:1.2rem; cursor:pointer; color:var(--text-main); display:flex;"><i class="ph ph-moon"></i></button>
+                    <button id="export-btn" style="background: var(--surface); color: var(--text-main); padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border); cursor:pointer; font-weight: 600; display:flex; align-items:center; gap:8px;"><i class="ph ph-download-simple"></i> Export CSV</button>
+                    <button class="primary-btn" id="add-btn"><i class="ph ph-plus"></i> New Item</button>
+                </div>
+            </header>
+
+            <div id="dashboard-view" class="view-section active">
+                <section class="summary-cards">
+                    <div class="card"><h3>Total Products</h3><p class="number" id="dash-total">0</p></div>
+                    <div class="card alert-card"><h3>Low Stock Items</h3><p class="number" id="dash-low">0</p></div>
+                    <div class="card"><h3>Total Value (THB)</h3><p class="number" id="dash-value">0</p></div>
+                </section>
+                <section class="charts-section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px;">
+                    <div class="card"><h3><i class="ph ph-chart-pie-slice"></i> หมวดหมู่สินค้า</h3><canvas id="categoryChart" style="max-height: 250px; margin-top:16px;"></canvas></div>
+                    <div class="card"><h3><i class="ph ph-trend-up"></i> มูลค่าสูงสุด (Top 5)</h3><canvas id="valueChart" style="max-height: 250px; margin-top:16px;"></canvas></div>
+                </section>
+            </div>
+
+            <div id="products-view" class="view-section hidden">
+                <section class="table-section">
+                    <h2 style="margin-bottom: 20px;"><i class="ph ph-cube"></i> ฐานข้อมูลสินค้า</h2>
+                    <table>
+                        <thead><tr><th>Image</th><th>SKU</th><th>Name</th><th>Category</th><th>Price</th><th>Action</th></tr></thead>
+                        <tbody id="product-table-body"></tbody>
+                    </table>
+                </section>
+            </div>
+
+            <div id="stock-view" class="view-section hidden">
+                <section class="table-section">
+                    <h2 style="margin-bottom: 20px;"><i class="ph ph-package"></i> จัดการสต็อก (In / Out)</h2>
+                    <table>
+                        <thead><tr><th>SKU</th><th>Name</th><th>Current Stock</th><th>Min. Stock</th><th>Action</th></tr></thead>
+                        <tbody id="stock-table-body"></tbody>
+                    </table>
+                </section>
+            </div>
+
+            <div id="orders-view" class="view-section hidden">
+                <section class="table-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2><i class="ph ph-receipt"></i> จัดการออเดอร์ (PO / SO / Return)</h2>
+                        <button class="primary-btn" onclick="openOrderModal()"><i class="ph ph-plus"></i> สร้างออเดอร์ใหม่</button>
+                    </div>
+                    <table>
+                        <thead><tr><th>Date</th><th>Order Type</th><th>SKU</th><th>Customer / Supplier</th><th>Qty</th></tr></thead>
+                        <tbody id="order-table-body"></tbody>
+                    </table>
+                </section>
+            </div>
+
+            <div id="history-view" class="view-section hidden">
+                <section class="table-section">
+                    <h2 style="margin-bottom: 20px;"><i class="ph ph-clock-counter-clockwise"></i> ประวัติการเข้า-ออกสต็อก</h2>
+                    <table>
+                        <thead><tr><th>Time</th><th>SKU</th><th>Type</th><th>Qty</th><th>Note</th></tr></thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </section>
+            </div>
+
+            <div id="audit-view" class="view-section hidden">
+                <section class="table-section">
+                    <h2 style="margin-bottom: 20px;"><i class="ph ph-shield-check"></i> Audit Log (บันทึกการกระทำในระบบ)</h2>
+                    <table>
+                        <thead><tr><th>Time</th><th>Action</th><th>SKU</th><th>Details</th><th>User</th></tr></thead>
+                        <tbody id="audit-table-body"></tbody>
+                    </table>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="add-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2><i class="ph-fill ph-package"></i> จัดการสินค้า</h2>
+            <form id="add-form">
+                <div class="input-group"><label>รูปภาพ</label><input type="file" id="new-image" accept="image/*"><img id="image-preview" style="display:none; max-width:100px; margin-top:10px; border-radius: 8px;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="input-group"><label>SKU</label><input type="text" id="new-sku" required></div>
+                    <div class="input-group"><label>หมวดหมู่</label><input type="text" id="new-category" required></div>
+                </div>
+                <div class="input-group"><label>ชื่อสินค้า</label><input type="text" id="new-name" required></div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="input-group"><label>ราคา</label><input type="number" id="new-price" required></div>
+                    <div class="input-group"><label>สต็อกเริ่มต้น</label><input type="number" id="new-stock" required></div>
+                    <div class="input-group"><label>จุดสั่งซื้อ (Min)</label><input type="number" id="new-minstock" required></div>
+                </div>
+                <div class="modal-actions" style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="cancel-btn" onclick="document.getElementById('add-modal').classList.add('hidden')">ยกเลิก</button>
+                    <button type="submit" class="primary-btn"><i class="ph ph-floppy-disk"></i> บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="tx-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2><i class="ph-fill ph-arrows-left-right"></i> รับเข้า / เบิกออก</h2>
+            <p id="tx-sku-display" style="margin-bottom:20px; color:var(--text-muted); font-size:14px;"></p>
+            <form id="tx-form">
+                <input type="hidden" id="tx-sku"><input type="hidden" id="tx-current-stock">
+                <div class="input-group"><label>ประเภท</label><select id="tx-type"><option value="IN">📥 รับเข้า (In)</option><option value="OUT">📤 เบิกออก (Out)</option></select></div>
+                <div class="input-group"><label>จำนวน</label><input type="number" id="tx-qty" required min="1"></div>
+                <div class="input-group"><label>หมายเหตุ</label><input type="text" id="tx-note" placeholder="เช่น เบิกไปใช้เอง, นับสต็อกใหม่"></div>
+                <div class="modal-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="cancel-btn" onclick="document.getElementById('tx-modal').classList.add('hidden')">ยกเลิก</button>
+                    <button type="submit" class="primary-btn"><i class="ph ph-check-circle"></i> ยืนยัน</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="order-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2><i class="ph-fill ph-receipt"></i> สร้างออเดอร์</h2>
+            <form id="order-form">
+                <div class="input-group">
+                    <label>ประเภทรายการ</label>
+                    <select id="order-type" required style="font-weight: bold;">
+                        <option value="PO">📥 Purchase Order (PO - สั่งซื้อเข้า)</option>
+                        <option value="SO">📤 Sales Order (SO - ขายออก)</option>
+                        <option value="RETURN">🔄 Return (ลูกค้ารับคืนสินค้า)</option>
+                    </select>
+                </div>
+                <div class="input-group"><label>เลือกสินค้า</label><select id="order-sku" required></select></div>
+                <div class="input-group"><label>จำนวน</label><input type="number" id="order-qty" required min="1"></div>
+                <div class="input-group"><label>ชื่อลูกค้า / ซัพพลายเออร์</label><input type="text" id="order-partner" placeholder="เช่น บจก. ของเล่นไทย หรือ คุณสมชาย" required></div>
+                <div class="modal-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="cancel-btn" onclick="document.getElementById('order-modal').classList.add('hidden')">ยกเลิก</button>
+                    <button type="submit" class="primary-btn"><i class="ph ph-check-circle"></i> บันทึกออเดอร์</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
